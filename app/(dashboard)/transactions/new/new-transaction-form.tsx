@@ -222,7 +222,7 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
                     {assetList.find((a) => a.id === selectedAssetId)?.symbol}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} align="start" className="min-w-64">
                   {assetList.map((asset) => (
                     <SelectItem key={asset.id} value={asset.id}>
                       {asset.symbol} — {asset.name}
@@ -241,7 +241,7 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
                 <SelectTrigger id="txType">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} align="start">
                   {TX_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
@@ -308,7 +308,7 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
                   <SelectTrigger id="currency">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false} align="start">
                     {CURRENCIES.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
