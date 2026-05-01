@@ -17,6 +17,12 @@ export type AssetState = {
   message?: string
 }
 
+export type AssetInlineResult = {
+  errors?: Record<string, string[]>
+  message?: string
+  asset?: { id: string; symbol: string; name: string; currency: string }
+}
+
 export async function createAsset(_prevState: AssetState, formData: FormData): Promise<AssetState> {
   const { userId } = await verifySession()
 
@@ -72,6 +78,41 @@ export async function updateAsset(id: string, _prevState: AssetState, formData: 
   revalidatePath('/assets')
   revalidatePath('/dashboard')
   redirect('/assets')
+}
+
+export async function createAssetInline(
+  _prevState: AssetInlineResult,
+  formData: FormData,
+): Promise<AssetInlineResult> {
+  const { userId } = await verifySession()
+
+  const raw = {
+    symbol: formData.get('symbol'),
+    name: formData.get('name'),
+    typeCode: formData.get('typeCode'),
+    currency: formData.get('currency'),
+  }
+
+  const parsed = assetSchema.safeParse(raw)
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors }
+  }
+
+  const existing = await db.asset.findFirst({
+    where: { userId, symbol: parsed.data.symbol },
+  })
+  if (existing) {
+    return { asset: { id: existing.id, symbol: existing.symbol, name: existing.name, currency: existing.currency } }
+  }
+
+  const asset = await db.asset.create({
+    data: { ...parsed.data, userId },
+    select: { id: true, symbol: true, name: true, currency: true },
+  })
+
+  revalidatePath('/assets')
+  revalidatePath('/dashboard')
+  return { asset }
 }
 
 export async function deleteAsset(id: string) {

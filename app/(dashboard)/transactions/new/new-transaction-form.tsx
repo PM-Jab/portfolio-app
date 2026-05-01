@@ -1,7 +1,10 @@
 'use client'
-import { useActionState } from 'react'
+import { useState, useTransition, useActionState } from 'react'
 import Link from 'next/link'
+import { PlusIcon, XIcon } from 'lucide-react'
 import { createTransaction, type TransactionState } from '@/server/actions/transactions'
+import { createAssetInline } from '@/server/actions/assets'
+import { ASSET_TYPES } from '@/lib/asset-types'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,11 +30,39 @@ const CURRENCIES = ['USD', 'THB', 'EUR', 'GBP', 'JPY', 'BTC']
 
 const initialState: TransactionState = {}
 
-export function NewTransactionForm({ assets }: { assets: Asset[] }) {
+export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] }) {
   const [state, formAction, isPending] = useActionState(createTransaction, initialState)
 
-  // Today's date in YYYY-MM-DD format
+  const [assetList, setAssetList] = useState<Asset[]>(initialAssets)
+  const [selectedAssetId, setSelectedAssetId] = useState('')
+  const [showNewAsset, setShowNewAsset] = useState(initialAssets.length === 0)
+
+  const [inlineErrors, setInlineErrors] = useState<Record<string, string[]>>({})
+  const [inlineMessage, setInlineMessage] = useState('')
+  const [isPendingAsset, startAssetTransition] = useTransition()
+
   const today = new Date().toISOString().split('T')[0]
+
+  const handleAssetSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    setInlineErrors({})
+    setInlineMessage('')
+    startAssetTransition(async () => {
+      const result = await createAssetInline({}, formData)
+      if (result.asset) {
+        setAssetList((prev) => {
+          const exists = prev.some((a) => a.id === result.asset!.id)
+          return exists ? prev : [...prev, result.asset!]
+        })
+        setSelectedAssetId(result.asset.id)
+        setShowNewAsset(false)
+      } else {
+        if (result.errors) setInlineErrors(result.errors)
+        if (result.message) setInlineMessage(result.message)
+      }
+    })
+  }
 
   return (
     <div className="max-w-lg space-y-6">
@@ -40,6 +71,111 @@ export function NewTransactionForm({ assets }: { assets: Asset[] }) {
         <p className="text-muted-foreground mt-1 text-sm">Record a new transaction.</p>
       </div>
 
+      {/* Inline new-asset form — sibling of the transaction form, never nested */}
+      {showNewAsset && (
+        <form onSubmit={handleAssetSubmit}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">New Asset</CardTitle>
+                {assetList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNewAsset(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <XIcon className="size-4" />
+                  </button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {inlineMessage && (
+                <p className="rounded bg-red-400/10 px-2 py-1.5 text-xs text-red-400">
+                  {inlineMessage}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-symbol" className="text-xs">Symbol</Label>
+                  <Input
+                    id="new-symbol"
+                    name="symbol"
+                    placeholder="AAPL"
+                    className="h-7 text-xs"
+                    required
+                  />
+                  {inlineErrors.symbol && (
+                    <p className="text-xs text-red-400">{inlineErrors.symbol[0]}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-name" className="text-xs">Name</Label>
+                  <Input
+                    id="new-name"
+                    name="name"
+                    placeholder="Apple Inc."
+                    className="h-7 text-xs"
+                    required
+                  />
+                  {inlineErrors.name && (
+                    <p className="text-xs text-red-400">{inlineErrors.name[0]}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type</Label>
+                  <Select name="typeCode" required>
+                    <SelectTrigger size="sm">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSET_TYPES.map((t) => (
+                        <SelectItem key={t.code} value={t.code}>
+                          {t.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {inlineErrors.typeCode && (
+                    <p className="text-xs text-red-400">{inlineErrors.typeCode[0]}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Currency</Label>
+                  <Select name="currency" defaultValue="USD" required>
+                    <SelectTrigger size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {inlineErrors.currency && (
+                    <p className="text-xs text-red-400">{inlineErrors.currency[0]}</p>
+                  )}
+                </div>
+              </div>
+
+              <Button type="submit" size="sm" disabled={isPendingAsset} className="w-full">
+                {isPendingAsset ? 'Creating…' : 'Create Asset'}
+              </Button>
+            </CardContent>
+          </Card>
+        </form>
+      )}
+
+      {/* Transaction form */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Transaction Details</CardTitle>
@@ -47,19 +183,47 @@ export function NewTransactionForm({ assets }: { assets: Asset[] }) {
         <CardContent>
           <form action={formAction} className="space-y-4">
             {state?.message && (
-              <p className="text-sm text-red-400 bg-red-400/10 rounded-md px-3 py-2">
+              <p className="rounded-md bg-red-400/10 px-3 py-2 text-sm text-red-400">
                 {state.message}
               </p>
             )}
 
+            {/* Asset selector */}
             <div className="space-y-2">
-              <Label htmlFor="assetId">Asset</Label>
-              <Select name="assetId" required>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="assetId">Asset</Label>
+                {/* type="button" prevents this from submitting the transaction form */}
+                <button
+                  type="button"
+                  onClick={() => setShowNewAsset((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  {showNewAsset ? (
+                    <><XIcon className="size-3" /> Cancel</>
+                  ) : (
+                    <><PlusIcon className="size-3" /> New asset</>
+                  )}
+                </button>
+              </div>
+              <Select
+                value={selectedAssetId}
+                onValueChange={(v) => setSelectedAssetId(v ?? '')}
+                name="assetId"
+                required
+              >
                 <SelectTrigger id="assetId">
-                  <SelectValue placeholder="Select asset" />
+                  <SelectValue
+                    placeholder={
+                      assetList.length === 0
+                        ? 'Create an asset above first'
+                        : 'Select asset'
+                    }
+                  >
+                    {assetList.find((a) => a.id === selectedAssetId)?.symbol}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {assets.map((asset) => (
+                  {assetList.map((asset) => (
                     <SelectItem key={asset.id} value={asset.id}>
                       {asset.symbol} — {asset.name}
                     </SelectItem>
@@ -180,7 +344,7 @@ export function NewTransactionForm({ assets }: { assets: Asset[] }) {
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={isPending}>
-                {isPending ? 'Adding...' : 'Add Transaction'}
+                {isPending ? 'Adding…' : 'Add Transaction'}
               </Button>
               <Link href="/transactions" className={cn(buttonVariants({ variant: 'ghost' }))}>
                 Cancel
