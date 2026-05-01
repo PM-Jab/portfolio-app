@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  baseCurrency  String    @default("USD")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  assets        Asset[]
+  snapshots     PortfolioSnapshot[]
+  reports       Report[]
+}
+
+model AssetType {
+  code             String   @id
+  displayName      String
+  category         String
+  pricingProvider  String   @default("mock")
+  metadataSchema   Json?
+  assets           Asset[]
+}
+
+model Asset {
+  id           String        @id @default(cuid())
+  typeCode     String
+  symbol       String
+  name         String
+  currency     String        @default("USD")
+  metadata     Json?
+  userId       String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetType    AssetType     @relation(fields: [typeCode], references: [code])
+  transactions Transaction[]
+  priceHistory PriceHistory[]
+
+  @@index([userId])
+  @@index([typeCode])
+}
+
+enum TxType {
+  BUY
+  SELL
+  DIVIDEND
+  DEPOSIT
+  WITHDRAWAL
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  assetId     String
+  txType      TxType
+  quantity    Decimal  @db.Decimal(20, 8)
+  price       Decimal  @db.Decimal(20, 8)
+  fee         Decimal  @db.Decimal(20, 8) @default(0)
+  currency    String   @default("USD")
+  executedAt  DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([executedAt])
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  assetId   String
+  timestamp DateTime
+  price     Decimal  @db.Decimal(20, 8)
+  currency  String   @default("USD")
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, timestamp])
+  @@index([assetId, timestamp])
+}
+
+model PortfolioSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  totalValue Decimal  @db.Decimal(20, 2)
+  costBasis  Decimal  @db.Decimal(20, 2)
+  breakdown  Json
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Report {
+  id           String   @id @default(cuid())
+  userId       String
+  generatedAt  DateTime @default(now())
+  periodEnd    DateTime @db.Date
+  baseCurrency String   @default("USD")
+  markdown     String   @db.Text
+  json         Json
+  pdfPath      String?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+}
