@@ -2,15 +2,16 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { verifySession } from '@/lib/dal'
 import { db } from '@/lib/db'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { PortfolioPieChart, type PieSlice } from '@/components/portfolio-pie-chart'
 
 export default async function DashboardPage() {
   const { userId } = await verifySession()
 
-  const [user, assetCount, transactionCount, recentAssets] = await Promise.all([
+  const [user, assetCount, transactionCount, recentAssets, assetsWithTx] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
     db.asset.count({ where: { userId } }),
     db.transaction.count({ where: { asset: { userId } } }),
@@ -20,7 +21,30 @@ export default async function DashboardPage() {
       take: 5,
       include: { assetType: true },
     }),
+    db.asset.findMany({
+      where: { userId },
+      include: {
+        assetType: { select: { displayName: true } },
+        transactions: { select: { txType: true, quantity: true, price: true } },
+      },
+    }),
   ])
+
+  // Compute net cost basis per asset type (BUY/DEPOSIT in, SELL/WITHDRAWAL out)
+  const valueByType: Record<string, number> = {}
+  for (const asset of assetsWithTx) {
+    let net = 0
+    for (const tx of asset.transactions) {
+      const amount = Number(tx.quantity) * Number(tx.price)
+      if (tx.txType === 'BUY' || tx.txType === 'DEPOSIT') net += amount
+      else if (tx.txType === 'SELL' || tx.txType === 'WITHDRAWAL') net -= amount
+    }
+    if (net > 0) {
+      const type = asset.assetType.displayName
+      valueByType[type] = (valueByType[type] ?? 0) + net
+    }
+  }
+  const pieData: PieSlice[] = Object.entries(valueByType).map(([name, value]) => ({ name, value }))
 
   return (
     <div className="space-y-8">
@@ -52,6 +76,16 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Portfolio breakdown pie chart */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Portfolio by Asset Type</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PortfolioPieChart data={pieData} />
+        </CardContent>
+      </Card>
 
       {/* Empty state or recent assets */}
       {assetCount === 0 ? (
