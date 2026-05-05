@@ -63,13 +63,69 @@ export async function createTransaction(_prevState: TransactionState, formData: 
   })
 
   revalidatePath('/transactions')
+  revalidatePath('/dashboard')
+  redirect('/transactions')
+}
+
+export async function updateTransaction(
+  id: string,
+  _prevState: TransactionState,
+  formData: FormData,
+): Promise<TransactionState> {
+  const { userId } = await verifySession()
+
+  const existing = await db.transaction.findFirst({
+    where: { id, asset: { userId } },
+  })
+  if (!existing) {
+    return { message: 'Transaction not found' }
+  }
+
+  const raw = {
+    assetId: formData.get('assetId'),
+    txType: formData.get('txType'),
+    quantity: formData.get('quantity'),
+    price: formData.get('price'),
+    fee: formData.get('fee') || '0',
+    currency: formData.get('currency'),
+    executedAt: formData.get('executedAt'),
+    notes: formData.get('notes') || undefined,
+  }
+
+  const parsed = transactionSchema.safeParse(raw)
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors }
+  }
+
+  const asset = await db.asset.findFirst({
+    where: { id: parsed.data.assetId, userId },
+  })
+  if (!asset) {
+    return { message: 'Asset not found' }
+  }
+
+  await db.transaction.update({
+    where: { id },
+    data: {
+      assetId: parsed.data.assetId,
+      txType: parsed.data.txType,
+      quantity: parsed.data.quantity,
+      price: parsed.data.price,
+      fee: parsed.data.fee || '0',
+      currency: parsed.data.currency,
+      executedAt: new Date(parsed.data.executedAt),
+      notes: parsed.data.notes || null,
+    },
+  })
+
+  revalidatePath('/transactions')
+  revalidatePath('/dashboard')
   redirect('/transactions')
 }
 
 export async function deleteTransaction(id: string) {
   const { userId } = await verifySession()
 
-  // Verify transaction belongs to user via asset
   const transaction = await db.transaction.findFirst({
     where: {
       id,
@@ -83,4 +139,5 @@ export async function deleteTransaction(id: string) {
 
   await db.transaction.delete({ where: { id } })
   revalidatePath('/transactions')
+  revalidatePath('/dashboard')
 }

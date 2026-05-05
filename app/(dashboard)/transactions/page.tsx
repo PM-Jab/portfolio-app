@@ -1,11 +1,10 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { verifySession } from '@/lib/dal'
 import { db } from '@/lib/db'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { DeleteTransactionButton } from '@/components/transactions/delete-transaction-button'
 
 const TX_TYPE_COLORS: Record<string, string> = {
   BUY: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
@@ -112,6 +112,7 @@ export default async function TransactionsPage({
                 <TableHead className="text-right">Fee</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Notes</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -155,6 +156,21 @@ export default async function TransactionsPage({
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                       {tx.notes || '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/transactions/${tx.id}/edit`}
+                          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span className="sr-only">Edit</span>
+                        </Link>
+                        <DeleteTransactionButton
+                          transactionId={tx.id}
+                          label={`${tx.txType} ${tx.asset.symbol} on ${tx.executedAt.toLocaleDateString()}`}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
