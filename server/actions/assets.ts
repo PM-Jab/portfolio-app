@@ -20,7 +20,7 @@ export type AssetState = {
 export type AssetInlineResult = {
   errors?: Record<string, string[]>
   message?: string
-  asset?: { id: string; symbol: string; name: string; currency: string }
+  asset?: { id: string; symbol: string; name: string; currency: string; typeCode: string }
 }
 
 export async function createAsset(_prevState: AssetState, formData: FormData): Promise<AssetState> {
@@ -102,12 +102,20 @@ export async function createAssetInline(
     where: { userId, symbol: parsed.data.symbol },
   })
   if (existing) {
-    return { asset: { id: existing.id, symbol: existing.symbol, name: existing.name, currency: existing.currency } }
+    return {
+      asset: {
+        id: existing.id,
+        symbol: existing.symbol,
+        name: existing.name,
+        currency: existing.currency,
+        typeCode: existing.typeCode,
+      },
+    }
   }
 
   const asset = await db.asset.create({
     data: { ...parsed.data, userId },
-    select: { id: true, symbol: true, name: true, currency: true },
+    select: { id: true, symbol: true, name: true, currency: true, typeCode: true },
   })
 
   revalidatePath('/assets')

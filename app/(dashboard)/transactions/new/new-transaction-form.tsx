@@ -23,9 +23,11 @@ interface Asset {
   symbol: string
   name: string
   currency: string
+  typeCode: string
 }
 
-const TX_TYPES = ['BUY', 'SELL', 'DIVIDEND', 'DEPOSIT', 'WITHDRAWAL']
+const TX_TYPES_DEFAULT = ['BUY', 'SELL', 'DIVIDEND', 'DEPOSIT', 'WITHDRAWAL']
+const TX_TYPES_CASH = ['DEPOSIT', 'WITHDRAWAL']
 const CURRENCIES = ['USD', 'THB', 'EUR', 'GBP', 'JPY', 'BTC']
 
 const initialState: TransactionState = {}
@@ -42,6 +44,9 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
   const [isPendingAsset, startAssetTransition] = useTransition()
 
   const today = new Date().toISOString().split('T')[0]
+  const selectedAsset = assetList.find((a) => a.id === selectedAssetId)
+  const isCash = selectedAsset?.typeCode === 'cash'
+  const txTypes = isCash ? TX_TYPES_CASH : TX_TYPES_DEFAULT
 
   const handleAssetSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -242,7 +247,7 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false} align="start">
-                  {TX_TYPES.map((t) => (
+                  {txTypes.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>
@@ -254,9 +259,9 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={isCash ? 'space-y-2' : 'grid grid-cols-2 gap-4'}>
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
+                <Label htmlFor="quantity">{isCash ? 'Amount' : 'Quantity'}</Label>
                 <Input
                   id="quantity"
                   name="quantity"
@@ -271,21 +276,25 @@ export function NewTransactionForm({ assets: initialAssets }: { assets: Asset[] 
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder="0.00"
-                  required
-                />
-                {state?.errors?.price && (
-                  <p className="text-xs text-red-400">{state.errors.price[0]}</p>
-                )}
-              </div>
+              {isCash ? (
+                <input type="hidden" name="price" value="1" />
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="0.00"
+                    required
+                  />
+                  {state?.errors?.price && (
+                    <p className="text-xs text-red-400">{state.errors.price[0]}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -1,5 +1,5 @@
 'use client'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { updateTransaction, type TransactionState } from '@/server/actions/transactions'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -20,6 +20,7 @@ interface Asset {
   symbol: string
   name: string
   currency: string
+  typeCode: string
 }
 
 interface TransactionData {
@@ -34,7 +35,8 @@ interface TransactionData {
   notes: string | null
 }
 
-const TX_TYPES = ['BUY', 'SELL', 'DIVIDEND', 'DEPOSIT', 'WITHDRAWAL']
+const TX_TYPES_DEFAULT = ['BUY', 'SELL', 'DIVIDEND', 'DEPOSIT', 'WITHDRAWAL']
+const TX_TYPES_CASH = ['DEPOSIT', 'WITHDRAWAL']
 const CURRENCIES = ['USD', 'THB', 'EUR', 'GBP', 'JPY', 'BTC']
 
 const initialState: TransactionState = {}
@@ -48,6 +50,11 @@ export function EditTransactionForm({
 }) {
   const updateWithId = updateTransaction.bind(null, transaction.id)
   const [state, formAction, isPending] = useActionState(updateWithId, initialState)
+
+  const [selectedAssetId, setSelectedAssetId] = useState(transaction.assetId)
+  const selectedAsset = assets.find((a) => a.id === selectedAssetId)
+  const isCash = selectedAsset?.typeCode === 'cash'
+  const txTypes = isCash ? TX_TYPES_CASH : TX_TYPES_DEFAULT
 
   return (
     <div className="max-w-lg space-y-6">
@@ -70,10 +77,15 @@ export function EditTransactionForm({
 
             <div className="space-y-2">
               <Label htmlFor="assetId">Asset</Label>
-              <Select name="assetId" defaultValue={transaction.assetId} required>
+              <Select
+                name="assetId"
+                value={selectedAssetId}
+                onValueChange={(v) => setSelectedAssetId(v ?? '')}
+                required
+              >
                 <SelectTrigger id="assetId">
                   <SelectValue placeholder="Select asset">
-                    {assets.find((a) => a.id === transaction.assetId)?.symbol}
+                    {selectedAsset?.symbol}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false} align="start" className="min-w-64">
@@ -96,7 +108,7 @@ export function EditTransactionForm({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false} align="start">
-                  {TX_TYPES.map((t) => (
+                  {txTypes.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>
@@ -108,9 +120,9 @@ export function EditTransactionForm({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={isCash ? 'space-y-2' : 'grid grid-cols-2 gap-4'}>
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
+                <Label htmlFor="quantity">{isCash ? 'Amount' : 'Quantity'}</Label>
                 <Input
                   id="quantity"
                   name="quantity"
@@ -125,21 +137,25 @@ export function EditTransactionForm({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="any"
-                  min="0"
-                  defaultValue={transaction.price}
-                  required
-                />
-                {state?.errors?.price && (
-                  <p className="text-xs text-red-400">{state.errors.price[0]}</p>
-                )}
-              </div>
+              {isCash ? (
+                <input type="hidden" name="price" value="1" />
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="any"
+                    min="0"
+                    defaultValue={transaction.price}
+                    required
+                  />
+                  {state?.errors?.price && (
+                    <p className="text-xs text-red-400">{state.errors.price[0]}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

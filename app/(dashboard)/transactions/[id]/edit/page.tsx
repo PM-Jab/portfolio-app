@@ -19,7 +19,7 @@ export default async function EditTransactionPage({
     db.asset.findMany({
       where: { userId },
       orderBy: { symbol: 'asc' },
-      select: { id: true, symbol: true, name: true, currency: true },
+      select: { id: true, symbol: true, name: true, currency: true, typeCode: true },
     }),
   ])
 
